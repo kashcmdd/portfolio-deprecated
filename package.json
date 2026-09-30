@@ -1,7 +1,8 @@
 {
-  "name": "kashhcmd-portfolio",
+  "name": "kashhcmd-portfolio-deprecated",
   "private": true,
   "version": "0.0.0",
+  "description": "DEPRECATED — superseded by kashcmdd/portfolio (https://kashcmdd.github.io/portfolio/); kept for history only and not maintained.",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3001",

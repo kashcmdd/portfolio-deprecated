@@ -1,3 +1,14 @@
+> ## ⚠️ Deprecated
+>
+> This repository is **deprecated and superseded** by
+> [`kashcmdd/portfolio`](https://github.com/kashcmdd/portfolio), which is the
+> live, canonical source:
+> **https://kashcmdd.github.io/portfolio/**.
+>
+> It is kept for history only and is **not maintained** — no fixes, updates or
+> deployments happen here. Do not use it as a source of truth. See
+> [`DEPRECATED.md`](DEPRECATED.md).
+
 <div align="center">
 
 # KashhCMD Portfolio
