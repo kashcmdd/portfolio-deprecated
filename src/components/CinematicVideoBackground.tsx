@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useMotionPref } from './MotionPrefProvider';
 
 export interface VideoOption {
   id: string;
@@ -41,6 +42,7 @@ export const CinematicVideoBackground: React.FC<CinematicVideoBackgroundProps> =
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [videoErrors, setVideoErrors] = useState<Set<number>>(new Set());
   const [hasActiveVideo, setHasActiveVideo] = useState(true);
+  const { reduced } = useMotionPref();
 
   const handleVideoError = useCallback((index: number) => {
     console.warn(`Video ${VIDEO_SOURCES[index].label} failed to load`);
@@ -66,6 +68,7 @@ export const CinematicVideoBackground: React.FC<CinematicVideoBackgroundProps> =
   }, [activeIndex]);
 
   useEffect(() => {
+    if (reduced) return;
     videoRefs.current.forEach((video, index) => {
       if (!video) return;
       if (index === activeIndex) {
@@ -82,15 +85,28 @@ export const CinematicVideoBackground: React.FC<CinematicVideoBackgroundProps> =
         }
       }
     });
-  }, [activeIndex, handleVideoError]);
+  }, [activeIndex, handleVideoError, reduced]);
+
+  // Only the active clip and the one after it are given a source. Four <video>
+  // elements all pointing at remote files meant four requests on first paint for
+  // one visible background; the other two now wait until they are about to be
+  // shown. The next clip still preloads so the cross-fade stays smooth.
+  const nextIndex = (activeIndex + 1) % VIDEO_SOURCES.length;
 
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none select-none z-0 bg-[#0a0a0a]">
+    <div
+      aria-hidden="true"
+      className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none select-none z-0 bg-[#0a0a0a]"
+    >
       <div className="absolute inset-0 bg-gradient-to-br from-[#121820] via-[#0a0a0a] to-[#0f141c] z-0" />
 
-      {VIDEO_SOURCES.map((item, index) => {
+      {/* Under reduced motion the videos are not rendered at all; the gradient
+          and the overlay below carry the hero on their own, and a still frame
+          is exactly what the preference is asking for. */}
+      {!reduced && VIDEO_SOURCES.map((item, index) => {
         const isActive = activeIndex === index;
         const hasError = videoErrors.has(index);
+        const isNext = index === nextIndex;
         
         return (
           <video
@@ -98,7 +114,7 @@ export const CinematicVideoBackground: React.FC<CinematicVideoBackgroundProps> =
             ref={(el) => {
               videoRefs.current[index] = el;
             }}
-            src={item.url}
+            src={isActive || isNext ? item.url : undefined}
             autoPlay={isActive && !hasError}
             muted
             loop

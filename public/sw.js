@@ -1,15 +1,34 @@
-const CACHE_NAME = 'kashcmd-portfolio-v1';
-const STATIC_CACHE = 'kashcmd-static-v1';
-const DYNAMIC_CACHE = 'kashcmd-dynamic-v1';
+// The build hash is substituted by scripts/copy-sw.mjs. A new build therefore
+// installs a worker with new cache names, and the activate step below clears
+// the old ones instead of serving last deploy's HTML, CSS and JS forever.
+const BUILD = '__BUILD_VERSION__';
+const CACHE_NAME = `kashcmd-portfolio-dev-${BUILD}`;
+const STATIC_CACHE = `kashcmd-static-dev-${BUILD}`;
+const DYNAMIC_CACHE = `kashcmd-dynamic-dev-${BUILD}`;
+
+// Cache Storage is scoped to the origin, not to this worker's scope, so the
+// activate step must only remove this app's own old caches. Deleting everything
+// unmatched would also wipe any other app installed on the same origin — on
+// kashcmdd.github.io that includes the production portfolio, whose offline
+// cache this dev worker has no business touching.
+const OWN_CACHE_PREFIXES = [
+  'kashcmd-portfolio-dev-',
+  'kashcmd-static-dev-',
+  'kashcmd-dynamic-dev-',
+];
+
+// The worker is served from the Vite base, so its own location is the source of
+// truth for it. Deriving the prefix here keeps the site working on any base
+// without a build step rewriting this file.
+const BASE = new URL('./', self.location).pathname;
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
-  '/',
-  '/portfolio/',
-  '/index.html',
-  '/manifest.json',
-  '/favicon.svg',
-  '/apple-touch-icon.png'
+  BASE,
+  `${BASE}index.html`,
+  `${BASE}manifest.json`,
+  `${BASE}favicon.svg`,
+  `${BASE}apple-touch-icon.png`
 ];
 
 // Install event - cache static assets
@@ -28,13 +47,13 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((cacheName) => {
-            return (
+          .filter(
+            (cacheName) =>
+              OWN_CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix)) &&
               cacheName !== STATIC_CACHE &&
               cacheName !== DYNAMIC_CACHE &&
               cacheName !== CACHE_NAME
-            );
-          })
+          )
           .map((cacheName) => {
             return caches.delete(cacheName);
           })
@@ -90,7 +109,7 @@ self.addEventListener('fetch', (event) => {
               return cachedResponse;
             }
             // Return offline fallback page
-            return caches.match('/portfolio/').then((cached) => {
+            return caches.match(BASE).then((cached) => {
               return cached || new Response('Offline - Please check your connection', {
                 status: 503,
                 statusText: 'Service Unavailable'
@@ -125,39 +144,27 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       }).catch(() => {
-        // Return a fallback for images
-        if (request.url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/)) {
-          return new Response('Image unavailable offline', {
-            status: 503,
-            statusText: 'Service Unavailable'
-          });
-        }
+        // respondWith(undefined) throws, so a cache miss offline has to resolve
+        // to a real Response whatever the asset type, not only for images.
+        const isImage = request.url.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i);
+        return new Response(isImage ? 'Image unavailable offline' : 'Unavailable offline', {
+          status: 503,
+          statusText: 'Service Unavailable'
+        });
       });
     })
   );
 });
 
-// Background sync for offline actions (optional future enhancement)
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-contact-form') {
-    event.waitUntil(syncContactForm());
-  }
-});
-
-// Push notifications (optional future enhancement)
+// Push notifications
 self.addEventListener('push', (event) => {
   const options = {
     body: event.data ? event.data.text() : 'New update available',
-    icon: '/favicon.svg',
-    badge: '/favicon.svg'
+    icon: `${BASE}favicon.svg`,
+    badge: `${BASE}favicon.svg`
   };
 
   event.waitUntil(
     self.registration.showNotification('KashhCMD Portfolio', options)
   );
 });
-
-async function syncContactForm() {
-  // Future: Implement form data synchronization
-  console.log('Syncing contact form data...');
-}

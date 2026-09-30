@@ -1,4 +1,127 @@
-import { Project, JournalEntry, TechSkill, ExplorationItem } from '../types';
+import {
+  Project,
+  JournalEntry,
+  TechSkill,
+  ExplorationItem,
+  CurrentlyBuilding,
+  RecentWork,
+  Architecture,
+  ExperienceEntry,
+  Testimonial,
+} from '../types';
+
+// Files in public/ are served from the Vite base, not the domain root, and a
+// string in this module is a runtime <img src> that the bundler never rewrites.
+// BASE_URL already carries the trailing slash and follows base in vite.config.ts.
+const asset = (file: string) => `${import.meta.env.BASE_URL}${file}`;
+
+/*
+ * Architecture diagrams (#19).
+ *
+ * Every node and edge here is traceable to the project's own description, tags
+ * or highlights - nothing is inferred. If a project gains or drops a component,
+ * the diagram has to change with it, or it stops being a description and starts
+ * being decoration.
+ */
+const scriptforgeArchitecture: Architecture = {
+  summary:
+    'A single Next.js application serves the device and script UI and its own API. Every mutating route is CSRF-protected and runs through a version service that keeps concurrent edits from clobbering each other, and a GPC parser handles the script bodies. Accounts, sessions and all persistent state live in SQLite, with 75 unit and end-to-end tests covering the paths.',
+  layers: [
+    { title: 'Client' },
+    { title: 'Application' },
+    { title: 'Services' },
+    { title: 'State & Tests' },
+  ],
+  nodes: [
+    { id: 'ui', label: 'Device & Script UI', detail: 'React + Tailwind', layer: 0 },
+    { id: 'routes', label: 'API Routes', detail: 'CSRF-protected', layer: 1 },
+    { id: 'accounts', label: 'Accounts', detail: 'self-serve', layer: 1 },
+    { id: 'versioning', label: 'Version Service', detail: 'conflict-safe', layer: 2 },
+    { id: 'parser', label: 'GPC Parser', layer: 2 },
+    { id: 'sessions', label: 'Session Guard', detail: 'invalidation', layer: 2 },
+    { id: 'sqlite', label: 'SQLite', detail: 'transactions', layer: 3 },
+    { id: 'vitest', label: 'Vitest', detail: '75 unit + e2e', layer: 3 },
+  ],
+  edges: [
+    { from: 'ui', to: 'routes', label: 'typed fetch' },
+    { from: 'ui', to: 'accounts' },
+    { from: 'routes', to: 'versioning', label: 'transaction' },
+    { from: 'routes', to: 'parser' },
+    { from: 'accounts', to: 'sessions' },
+    { from: 'versioning', to: 'sqlite' },
+    { from: 'sessions', to: 'sqlite' },
+    { from: 'routes', to: 'vitest', label: 'covered by' },
+    { from: 'versioning', to: 'vitest', label: 'covered by' },
+  ],
+};
+
+const musicBotArchitecture: Architecture = {
+  summary:
+    'The bot process and the audio work are split. discord.js handles 25-odd slash commands in the guild and defers every playback request to a separate Lavalink node, which pulls and decodes tracks through yt-dlp and ffmpeg. A three-tier permission model sits in front of playback, checked against both DJ roles and per-guild overrides, and an OAuth2 web dashboard can change that configuration remotely. The whole thing ships as a single Docker image.',
+  layers: [
+    { title: 'Client' },
+    { title: 'Bot' },
+    { title: 'Services' },
+    { title: 'Audio & State' },
+  ],
+  nodes: [
+    { id: 'voice', label: 'Guild Voice', detail: 'incl. 24/7 mode', layer: 0 },
+    { id: 'dash', label: 'Web Dashboard', detail: 'OAuth2', layer: 0 },
+    { id: 'cmds', label: 'Slash Commands', detail: '25+', layer: 1 },
+    { id: 'guards', label: 'Tier + DJ Guards', detail: 'Free / Pro / VIP', layer: 2 },
+    { id: 'lavalink', label: 'Lavalink Node', detail: 'audio pipeline', layer: 2 },
+    { id: 'config', label: 'Config API', detail: 'remote config', layer: 2 },
+    { id: 'playlists', label: 'Saved Playlists', layer: 2 },
+    { id: 'sources', label: 'yt-dlp + ffmpeg', detail: 'YT / Spotify / SC', layer: 3 },
+    { id: 'tiers', label: 'Per-Guild Tiers', layer: 3 },
+  ],
+  edges: [
+    { from: 'voice', to: 'cmds' },
+    { from: 'dash', to: 'config' },
+    { from: 'cmds', to: 'guards' },
+    { from: 'cmds', to: 'lavalink' },
+    { from: 'cmds', to: 'config' },
+    { from: 'cmds', to: 'playlists' },
+    { from: 'guards', to: 'tiers' },
+    { from: 'config', to: 'tiers' },
+    { from: 'lavalink', to: 'sources' },
+  ],
+};
+
+const melonArchitecture: Architecture = {
+  summary:
+    'A maintained fork of the Melon multipurpose bot. One hybrid router accepts both prefix and slash commands and dispatches into feature modules for antinuke protection, automod, AI chat, tickets, giveaways, join-to-create voice and autopost. Those modules never talk to a database directly: everything goes through Sequelize, which keeps the fork manageable when the upstream bot changes shape.',
+  layers: [
+    { title: 'Guild' },
+    { title: 'Command Layer' },
+    { title: 'Feature Modules' },
+    { title: 'Persistence' },
+    { title: 'Storage' },
+  ],
+  nodes: [
+    { id: 'guild', label: 'Discord Guild', detail: 'prefix + slash', layer: 0 },
+    { id: 'router', label: 'Hybrid Router', detail: 'both command styles', layer: 1 },
+    { id: 'antinuke', label: 'Antinuke', detail: 'protection', layer: 2 },
+    { id: 'automod', label: 'Automod', layer: 2 },
+    { id: 'ai', label: 'AI Chat', layer: 2 },
+    { id: 'tickets', label: 'Tickets + Giveaways', layer: 2 },
+    { id: 'voice', label: 'Voice + Autopost', layer: 2 },
+    { id: 'orm', label: 'Sequelize ORM', layer: 3 },
+    { id: 'pg', label: 'PostgreSQL', layer: 4 },
+  ],
+  edges: [
+    { from: 'guild', to: 'router' },
+    { from: 'router', to: 'antinuke' },
+    { from: 'router', to: 'automod' },
+    { from: 'router', to: 'ai' },
+    { from: 'router', to: 'tickets' },
+    { from: 'router', to: 'voice' },
+    { from: 'antinuke', to: 'orm' },
+    { from: 'automod', to: 'orm' },
+    { from: 'tickets', to: 'orm' },
+    { from: 'orm', to: 'pg' },
+  ],
+};
 
 export const warriorDetails = {
   name: "KashhCMD",
@@ -16,10 +139,12 @@ export const projectsData: Project[] = [
   {
     id: "rainbow-leaderboard",
     title: "Rainbow Leaderboard",
+    kind: "Web",
     category: "Competitive Ladder Platform",
     subtitle: "ELO-Ranked Rainbow Six Siege Ladder with Tournaments, Seasons & Discord Auth",
+    outcome: "Replaces ad-hoc spreadsheet ladders with a self-hosted, audited ranking platform a community can run itself.",
     description: "A self-hosted competitive ranking platform for Rainbow Six Siege communities. Runs a Glicko-style ELO engine with provisional ratings, margin-of-victory weighting and inactivity decay across 1v1 through 5v5 formats, wrapped in a season and tournament system with visual bracket generation. Players authenticate through Discord OAuth2 with granular admin roles, and 41 hand-built SVG rank icons carry the leaderboard from Bronze through Champion. Ships with an admin panel (CSV bulk import, match editing, audit log), one-click CSV/JSON export, and a pytest suite.",
-    image: "/portfolio/rainbow-leaderboard.webp",
+    image: asset("rainbow-leaderboard.webp"),
     tags: ["Python 3.12", "FastAPI", "PostgreSQL", "SQLAlchemy", "Alembic", "Jinja2", "Tailwind CSS", "Discord OAuth2", "APScheduler", "Docker"],
     githubUrl: "https://github.com/kashcmdd/rainbow-leaderboard",
     featured: true,
@@ -34,49 +159,96 @@ export const projectsData: Project[] = [
   {
     id: "scriptforge",
     title: "ScriptForge",
+    kind: "Full-Stack",
     category: "Full-Stack Web App",
     subtitle: "Controller-Script Hub for Streaming Devices",
+    outcome: "Turns risky, manual device-script edits into versioned, conflict-safe changes a whole team can make.",
     description: "A Next.js controller-script hub: device & script management, transactional script editing with conflict-safe versions, self-serve accounts with session invalidation and account deletion, CSRF-protected APIs, a GPC script parser, and 75 unit + end-to-end tests.",
-    image: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80",
+    image: asset("scriptforge-placeholder.svg"),
     tags: ["Next.js", "React", "TypeScript", "Tailwind CSS", "SQLite", "Vitest"],
     githubUrl: "https://github.com/kashcmdd/scriptforge",
     featured: true,
     colSpanDesktop: 7,
     aspectRatio: "aspect-[16/10]",
+    // Real bullets, written from the project's own description. The modal and the
+    // generated page both fall back to a generic trio when this is absent, and a
+    // generic "liquid glass UI" line on a server-rendered Next.js app reads as
+    // filler, so every project carries its own.
+    highlights: [
+      "Transactional script editing with conflict-safe versions",
+      "Self-serve accounts with session invalidation and account deletion",
+      "CSRF-protected APIs and a GPC script parser",
+      "75 unit and end-to-end tests across the routes and the version service",
+    ],
+    architecture: scriptforgeArchitecture,
   },
   {
     id: "discord-music-bot",
     title: "Discord Music Bot",
+    kind: "Discord",
     category: "Discord Bot Development",
     subtitle: "Multi-Source Music Bot with Web Dashboard, Premium Tiers & Docker Deploys",
+    outcome: "One bot across three streaming sources, configured from a dashboard and deployed with a single Docker command.",
     description: "A full-featured Discord music bot covering YouTube, Spotify and SoundCloud playback through a Lavalink-backed audio pipeline, with 25+ slash commands covering queue management, playback filters, lyrics and saved playlists. Adds a three-tier permission model (Free / Pro / VIP) that gates queue depth, volume ceiling, seek, autoplay and a 24/7 voice mode, enforced by both DJ-role checks and per-guild tier overrides. Ships with an OAuth2 web dashboard for remote configuration and a Docker image for one-command deployment.",
-    image: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=1200&q=80",
+    image: asset("discord-music-bot-placeholder.svg"),
     tags: ["Node.js", "Discord.js", "Lavalink", "yt-dlp", "ffmpeg", "Docker"],
     githubUrl: "https://github.com/kashcmdd/discord-music-bot",
     featured: true,
     colSpanDesktop: 5,
     aspectRatio: "aspect-[4/3]",
+    highlights: [
+      "YouTube, Spotify and SoundCloud playback through a Lavalink audio pipeline",
+      "25+ slash commands covering queue, filters, lyrics and saved playlists",
+      "Free / Pro / VIP tiers enforced by DJ roles and per-guild overrides",
+      "OAuth2 web dashboard and a one-command Docker image",
+    ],
+    architecture: musicBotArchitecture,
+    // The command surface, grouped the way the bot's own description already
+    // groups it. inviteUrl / supportUrl / stats are left unset on purpose: there
+    // is no public invite or live count to cite yet, and the modal renders each
+    // of those only when it is present, so nothing false ships in the meantime.
+    commands: [
+      { group: "Queue", detail: "Add, remove, move, shuffle and loop tracks in the active queue" },
+      { group: "Playback filters", detail: "Live audio filters applied to the current track" },
+      { group: "Lyrics", detail: "Fetch the lyrics for whatever is playing" },
+      { group: "Saved playlists", detail: "Save and reload per-guild playlists" },
+    ],
   },
   {
     id: "melon",
     title: "Melon",
+    kind: "Discord",
     category: "Discord Moderation",
     subtitle: "Maintained Fork of an All-in-One Multipurpose Bot",
+    outcome: "Keeps a large, long-lived community bot maintainable — security fixes and moderation kept current instead of rotting.",
     description: "A maintained fork of the Melon multipurpose bot — antinuke protection, automod, AI chat, tickets, giveaways, join-to-create voice, autopost and more, on hybrid prefix + slash commands with Sequelize-backed Postgres state.",
-    image: "/portfolio/melon.webp",
+    image: asset("melon.webp"),
     tags: ["Discord.js", "Node.js", "PostgreSQL", "Sequelize"],
     githubUrl: "https://github.com/kashcmdd/Melon-All-In-One-Discord-Bot",
     featured: true,
     colSpanDesktop: 5,
     aspectRatio: "aspect-[4/3]",
+    highlights: [
+      "Hybrid prefix and slash commands behind a single router",
+      "Antinuke, automod, tickets, giveaways and join-to-create voice modules",
+      "Sequelize over PostgreSQL, so feature modules never touch the database directly",
+    ],
+    architecture: melonArchitecture,
+    commands: [
+      { group: "Moderation", detail: "Antinuke protection and automod" },
+      { group: "Community", detail: "Tickets, giveaways and join-to-create voice" },
+      { group: "Engagement", detail: "AI chat and autopost" },
+    ],
   },
   {
     id: "kashhcmd-portfolio",
     title: "KashhCMD Portfolio",
+    kind: "Web",
     category: "Web Design & Frontend",
     subtitle: "Liquid Glass Landing Page, Deployed on GitHub Pages",
+    outcome: "Reads as fully crawlable static pages to crawlers and as a native-feeling app to visitors, on a small first-paint budget.",
     description: "This site — a cinematic dark portfolio with liquid glass visuals, GSAP animations and HLS video backgrounds, personalized and continuously deployed to GitHub Pages through a push-triggered Actions workflow.",
-    image: "/portfolio/portfolio-site.webp",
+    image: asset("portfolio-site.webp"),
     tags: ["React 19", "Vite", "TypeScript", "Tailwind CSS v4", "GSAP", "GitHub Pages"],
     githubUrl: "https://github.com/kashcmdd/portfolio",
     liveUrl: "https://kashcmdd.github.io/portfolio/",
@@ -86,7 +258,7 @@ export const projectsData: Project[] = [
     highlights: [
       "Liquid glass design tokens in Tailwind v4, composed over a responsive 12-column bento grid",
       "HLS video backgrounds gated by IntersectionObserver, with the 594 kB parser lazy-loaded and skipped entirely on native-HLS browsers",
-      "Push-to-deploy Pages workflow with vendor code-splitting holding initial JS to about 440 kB",
+      "Push-to-deploy Pages workflow with vendor code-splitting holding first-paint JS to about 585 kB",
     ],
     demoUrl: "https://kashcmdd.github.io/portfolio/",
     demoDescription: "Live portfolio with liquid glass effects, video backgrounds, and interactive animations",
@@ -98,6 +270,59 @@ export const projectsData: Project[] = [
     ],
   },
 ];
+
+/**
+ * The experience timeline.
+ *
+ * A recruiter scans for "what, with whom, when". With a self-directed body of
+ * work there is no employer to name, so the milestones are the projects
+ * themselves and the summary is each project's own `outcome` line — the same
+ * sentence the card and the case study already show, so the three can never
+ * drift apart.
+ *
+ * The periods are real. The months come from the repositories' own first
+ * commits; a project whose history was not available carries the bare year
+ * instead of a made-up month, because a timeline that invents detail is worse
+ * than one that admits the limit of what it knows.
+ */
+const experiencePeriods: Record<string, string> = {
+  'kashhcmd-portfolio': 'Sep 2026',
+  'rainbow-leaderboard': 'Jun 2026',
+  melon: 'Jun 2026',
+  scriptforge: '2026',
+  'discord-music-bot': '2026',
+};
+
+// Newest first, which is the order the timeline reads top to bottom.
+const experienceOrder = [
+  'kashhcmd-portfolio',
+  'rainbow-leaderboard',
+  'melon',
+  'scriptforge',
+  'discord-music-bot',
+];
+
+export const experienceData: ExperienceEntry[] = experienceOrder
+  .map((id) => projectsData.find((project) => project.id === id))
+  .filter((project): project is Project => Boolean(project))
+  .map((project) => ({
+    id: `work-${project.id}`,
+    period: experiencePeriods[project.id] ?? '2026',
+    title: project.title,
+    org: project.kind === 'Discord' ? 'Discord bot — independent' : 'Web app — independent',
+    summary: project.outcome ?? project.subtitle,
+    stack: project.tags.slice(0, 6),
+    projectId: project.id,
+  }));
+
+/**
+ * Quotes from real people. Intentionally empty.
+ *
+ * The section that consumes this returns null while the list is empty, so there
+ * is no invented praise to remember to delete later. Add objects shaped like
+ * { quote, author, role?, url? } and the section appears on its own.
+ */
+export const testimonialsData: Testimonial[] = [];
 
 export const techSkillsData: TechSkill[] = [
   // Frontend
@@ -140,6 +365,10 @@ export const journalEntriesData: JournalEntry[] = [
     date: "SEP 25, 2026",
     readTime: "7 MIN READ",
     category: "ALGORITHMS",
+    decision: {
+      chose: "A decay floor at the current rank, linear and capped",
+      over: "Decaying towards zero on a fixed daily subtraction",
+    },
     image: "https://images.unsplash.com/photo-1516116216624-53e697fedbea?auto=format&fit=crop&w=800&q=80",
     content: [
       {
@@ -233,6 +462,10 @@ decay = min(days_inactive * settings.decay_per_day, settings.max_decay)`,
     date: "SEP 25, 2026",
     readTime: "6 MIN READ",
     category: "PERFORMANCE",
+    decision: {
+      chose: "Lazy-loading the 594 kB HLS parser on demand",
+      over: "A single static import paid for by every visitor",
+    },
     image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
     content: [
       {
@@ -324,6 +557,10 @@ const { default: Hls } = await import('hls.js');`,
         type: "quote",
         text: "Initial JavaScript went from 1,076 kB to about 440 kB. The hls chunk is still 595 kB, it just is not your problem until you scroll to it.",
       },
+      {
+        type: "paragraph",
+        text: "Those figures are from the day of the change, and the site has grown a lot since: the journal, the command palette, the case-study modals, the decision log and the architecture diagrams all landed afterwards. First paint measures about 585 kB today, still spread across the same five cached chunks. That is not the exercise failing. Splitting was never a promise that the number would stay small, only that a growing one keeps arriving in pieces the browser can cache separately.",
+      },
     ],
   },
   {
@@ -333,6 +570,10 @@ const { default: Hls } = await import('hls.js');`,
     date: "SEP 25, 2026",
     readTime: "5 MIN READ",
     category: "ARCHITECTURE",
+    decision: {
+      chose: "SQLite for the single-node app, Postgres for the bot",
+      over: "Reaching for one database everywhere",
+    },
     image: "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&w=800&q=80",
     content: [
       {
@@ -393,6 +634,10 @@ const { default: Hls } = await import('hls.js');`,
     date: "SEP 25, 2026",
     readTime: "6 MIN READ",
     category: "DEPLOYMENT",
+    decision: {
+      chose: "A static, build-time URL scheme with no client router",
+      over: "A runtime router that has to reinvent the base path",
+    },
     image: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80",
     content: [
       {
@@ -499,6 +744,10 @@ if (match) openEntry(match[1]);`,
     date: "SEP 25, 2026",
     readTime: "5 MIN READ",
     category: "ARCHITECTURE",
+    decision: {
+      chose: "A six-member typed block union rendered by the site itself",
+      over: "Markdown plus three dependencies to render it",
+    },
     image: "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=800&q=80",
     content: [
       {
@@ -628,5 +877,46 @@ export const explorationItemsData: ExplorationItem[] = [
     category: "CLI Interface",
     image: "https://images.unsplash.com/photo-1629654297299-c8506221ca97?auto=format&fit=crop&w=800&q=80",
     description: "Interactive shell environment in the browser with custom command parsing and ASCII art."
+  },
+];
+
+/**
+ * The one line of work in progress shown under the hero. This is the only field
+ * on the site that is expected to change often, which is the point: it answers
+ * "is any of this still alive?" without writing a post.
+ *
+ * Set the whole thing to null to hide the strip.
+ */
+export const currentlyBuildingData: CurrentlyBuilding = {
+  name: 'KashhCMD Portfolio',
+  description:
+    'Architecture diagrams and decision logs now ship as static pages; search ranks by relevance.',
+  status: 'In progress',
+};
+
+/**
+ * A short changelog shown next to the current work. Keep it to the handful of
+ * changes worth a stranger's attention, newest first, and keep the dates real.
+ */
+export const recentWorkData: RecentWork[] = [
+  {
+    date: 'Sep 2026',
+    title: 'Architecture diagrams on project pages',
+    kind: 'Feature',
+  },
+  {
+    date: 'Sep 2026',
+    title: 'Search results ranked by relevance',
+    kind: 'Feature',
+  },
+  {
+    date: 'Sep 2026',
+    title: 'Live-demo badges only when a demo exists',
+    kind: 'Fix',
+  },
+  {
+    date: 'Sep 2026',
+    title: 'Decision log for every journal entry',
+    kind: 'Content',
   },
 ];

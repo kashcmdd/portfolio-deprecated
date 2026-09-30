@@ -27,7 +27,10 @@
     <link rel="manifest" href="/manifest.json" />
 
     <!-- RSS Feed -->
-    <link rel="alternate" type="application/rss+xml" title="KashhCMD Journal RSS Feed" href="/rss.xml" />
+    <!-- rss.xml is generated into dist/ rather than committed to public/, so Vite
+         has no asset record for it and leaves a bare /rss.xml pointing at the
+         domain root. %BASE_URL% is textual substitution and does get rewritten. -->
+    <link rel="alternate" type="application/rss+xml" title="KashhCMD Journal RSS Feed" href="%BASE_URL%rss.xml" />
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -58,6 +61,7 @@
     <meta name="twitter:creator" content="@kashcmdd" />
 
     <!-- Additional SEO -->
+    <!-- Fill these two with the real tokens issued by each search console. -->
     <meta name="google-site-verification" content="" />
     <meta name="msvalidate.01" content="" />
     <link rel="author" href="https://github.com/kashcmdd" />
@@ -89,6 +93,13 @@
       type="font/woff2"
       crossorigin
     />
+
+    <!-- The hero paints a remote video and a remote overlay image; opening
+         those connections now saves a round trip before they are requested. -->
+    <link rel="preconnect" href="https://d8j0ntlcm91z4.cloudfront.net" crossorigin />
+    <link rel="preconnect" href="https://soft-zoom-63098134.figma.site" crossorigin />
+    <link rel="dns-prefetch" href="https://stream.mux.com" />
+    <link rel="dns-prefetch" href="https://images.unsplash.com" />
   </head>
   <body class="bg-[#0a0a0a] text-white font-body antialiased overflow-x-hidden selection:bg-white/20 selection:text-white">
     <div id="root"></div>

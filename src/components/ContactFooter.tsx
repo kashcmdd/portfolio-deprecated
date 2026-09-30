@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { gsap } from 'gsap';
 import { HlsVideoBackground } from './HlsVideoBackground';
 import { warriorDetails } from '../data/portfolioData';
-import { ArrowUpRight, MessageSquare, Heart, BookOpen } from 'lucide-react';
+import { ArrowUpRight, MessageSquare, BookOpen, FileDown, FileText, LayoutGrid, Compass, Rss } from 'lucide-react';
+import NewsletterSignup from './NewsletterSignup';
+import { useMotionPref } from './MotionPrefProvider';
 
 interface ContactFooterProps {
   onOpenContactModal: () => void;
@@ -14,21 +15,50 @@ export const ContactFooter: React.FC<ContactFooterProps> = ({
   onNavigateTop,
 }) => {
   const marqueeRef = useRef<HTMLDivElement | null>(null);
+  const { reduced } = useMotionPref();
 
-  // Marquee animation with GSAP
+  // The marquee is below the fold, so GSAP is not imported until the footer is
+  // near the viewport. A visitor who never scrolls this far never downloads it,
+  // and one who does gets the animation as the footer slides in. Under reduced
+  // motion the row is simply left static, which is the whole point.
   useEffect(() => {
-    if (!marqueeRef.current) return;
-    const ctx = gsap.context(() => {
-      gsap.to('.marquee-inner', {
-        xPercent: -50,
-        repeat: -1,
-        duration: 25,
-        ease: 'none',
-      });
-    }, marqueeRef);
+    const target = marqueeRef.current;
+    if (!target || reduced) return;
 
-    return () => ctx.revert();
-  }, []);
+    let cancelled = false;
+    let ctx: { revert: () => void } | undefined;
+
+    const start = () => {
+      void import('gsap').then(({ gsap }) => {
+        if (cancelled) return;
+        ctx = gsap.context(() => {
+          gsap.to('.marquee-inner', {
+            xPercent: -50,
+            repeat: -1,
+            duration: 25,
+            ease: 'none',
+          });
+        }, target);
+      });
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          observer.disconnect();
+          start();
+        }
+      },
+      { rootMargin: '300px' }
+    );
+    observer.observe(target);
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+      ctx?.revert();
+    };
+  }, [reduced]);
 
   return (
     <footer id="contact" className="relative w-full bg-[#0a0a0a] text-white overflow-hidden pt-20 pb-10">
@@ -91,6 +121,8 @@ export const ContactFooter: React.FC<ContactFooterProps> = ({
           </div>
         </div>
 
+        <NewsletterSignup />
+
         {/* Bottom Bar */}
         <div className="pt-12 mt-12 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-6 text-xs font-body text-neutral-400">
           <div className="flex items-center gap-2">
@@ -108,21 +140,64 @@ export const ContactFooter: React.FC<ContactFooterProps> = ({
           {/* Social Links */}
           <div className="flex items-center gap-6">
             <a
+              href={`${import.meta.env.BASE_URL}projects/`}
+              className="flex items-center gap-1.5 hover:text-white transition-colors"
+            >
+              <LayoutGrid className="w-4 h-4" />
+              <span>Projects</span>
+            </a>
+            <a
               href={`${import.meta.env.BASE_URL}journal/`}
               className="flex items-center gap-1.5 hover:text-white transition-colors"
             >
               <BookOpen className="w-4 h-4" />
               <span>Journal</span>
             </a>
+            <a
+              href={`${import.meta.env.BASE_URL}resume/`}
+              className="flex items-center gap-1.5 hover:text-white transition-colors"
+            >
+              <FileText className="w-4 h-4" />
+              <span>Resume</span>
+            </a>
+            <a
+              href={`${import.meta.env.BASE_URL}KashhCMD-Resume.pdf`}
+              download
+              className="flex items-center gap-1.5 hover:text-white transition-colors"
+            >
+              <FileDown className="w-4 h-4" />
+              <span>PDF</span>
+            </a>
+            <a
+              href={`${import.meta.env.BASE_URL}uses/`}
+              className="flex items-center gap-1.5 hover:text-white transition-colors"
+            >
+              <Compass className="w-4 h-4" />
+              <span>Uses</span>
+            </a>
+            <a
+              href={`${import.meta.env.BASE_URL}rss.xml`}
+              className="flex items-center gap-1.5 hover:text-white transition-colors"
+            >
+              <Rss className="w-4 h-4" />
+              <span>RSS</span>
+            </a>
             <button
               onClick={onOpenContactModal}
               className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
             >
               <MessageSquare className="w-4 h-4" />
-              <span>Discord</span>
+              <span>Contact</span>
             </button>
           </div>
         </div>
+
+        {/* Credits, the way the portfolios this one is measured against close:
+            small, human, and specific about what it is made of. */}
+        <p className="mt-6 text-center text-[11px] font-body text-neutral-600">
+          Designed and built by {warriorDetails.name} · React, TypeScript, Vite and Tailwind CSS ·
+          Static pages generated at build time
+        </p>
       </div>
     </footer>
   );

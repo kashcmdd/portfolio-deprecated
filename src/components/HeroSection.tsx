@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { gsap } from 'gsap';
 import { CinematicVideoBackground, VIDEO_SOURCES } from './CinematicVideoBackground';
 import { warriorDetails } from '../data/portfolioData';
 import { ArrowUpRight, Eye } from 'lucide-react';
+import { useMotionPref } from './MotionPrefProvider';
 
 interface HeroSectionProps {
   onNavigateToWork: () => void;
@@ -19,38 +19,74 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   const [activeVideo, setActiveVideo] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const heroRef = useRef<HTMLDivElement | null>(null);
+  const { reduced } = useMotionPref();
 
   useEffect(() => {
+    // The rotating role is motion in its own right, so under a reduced-motion
+    // preference it stays on the first role instead of cycling.
+    if (reduced) return;
     const interval = setInterval(() => {
       setRoleIndex((prev) => (prev + 1) % ROLES.length);
     }, 2500);
     return () => clearInterval(interval);
-  }, []);
+  }, [reduced]);
 
+  // GSAP is a large dependency for one intro timeline, so it is imported after
+  // mount instead of shipped in the first bundle; the reveal starts the moment
+  // the chunk resolves. The context is kept so it can be reverted on unmount.
   useEffect(() => {
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    // The copy starts hidden and the timeline is what shows it, so any path that
+    // does not run the timeline — reduced motion, or a chunk that fails to load
+    // — has to reveal the hero by hand or leave it blank.
+    const revealNow = () => {
+      heroRef.current
+        ?.querySelectorAll<HTMLElement>('.name-reveal, .blur-in')
+        .forEach((el) => {
+          el.style.opacity = '1';
+          el.style.transform = 'none';
+          el.style.filter = 'none';
+        });
+    };
 
-      tl.to('.name-reveal', {
-        opacity: 1,
-        y: 0,
-        duration: 1.0,
-        delay: 0.1,
-      }).to(
-        '.blur-in',
-        {
-          opacity: 1,
-          filter: 'blur(0px)',
-          y: 0,
-          duration: 0.8,
-          stagger: 0.1,
-        },
-        '-=0.6'
-      );
-    }, heroRef);
+    if (reduced) {
+      revealNow();
+      return;
+    }
 
-    return () => ctx.revert();
-  }, []);
+    let cancelled = false;
+    let ctx: { revert: () => void } | undefined;
+
+    void import('gsap')
+      .then(({ gsap }) => {
+        if (cancelled) return;
+        ctx = gsap.context(() => {
+          const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+          tl.to('.name-reveal', {
+            opacity: 1,
+            y: 0,
+            duration: 1.0,
+            delay: 0.1,
+          }).to(
+            '.blur-in',
+            {
+              opacity: 1,
+              filter: 'blur(0px)',
+              y: 0,
+              duration: 0.8,
+              stagger: 0.1,
+            },
+            '-=0.6'
+          );
+        }, heroRef);
+      })
+      .catch(revealNow);
+
+    return () => {
+      cancelled = true;
+      ctx?.revert();
+    };
+  }, [reduced]);
 
   const handleSelectVideo = (index: number) => {
     if (index === activeVideo || isTransitioning) return;

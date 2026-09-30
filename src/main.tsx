@@ -1,21 +1,24 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
+import { MotionPrefProvider } from './components/MotionPrefProvider.tsx';
 import './index.css';
 import * as serviceWorkerRegistration from './utils/serviceWorkerRegistration';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <MotionPrefProvider>
+      <App />
+    </MotionPrefProvider>
   </StrictMode>,
 );
 
 // Register service worker for PWA support
 serviceWorkerRegistration.register({
-  onSuccess: (registration) => {
+  onSuccess: () => {
     console.log('Service worker registration successful');
   },
-  onUpdate: (registration) => {
+  onUpdate: () => {
     console.log('Service worker updated');
     // You could add a UI notification here to prompt user to refresh
   },
